@@ -23,119 +23,115 @@
 //
 #include "lp_data/HighsCallbackStruct.h"
 
-const HighsInt kHighsMaximumStringLength = 512;
-
-const HighsInt kHighsStatusError = -1;
-const HighsInt kHighsStatusOk = 0;
-const HighsInt kHighsStatusWarning = 1;
-
-const HighsInt kHighsVarTypeContinuous = 0;
-const HighsInt kHighsVarTypeInteger = 1;
-const HighsInt kHighsVarTypeSemiContinuous = 2;
-const HighsInt kHighsVarTypeSemiInteger = 3;
-const HighsInt kHighsVarTypeImplicitInteger = 4;
-
-const HighsInt kHighsOptionTypeBool = 0;
-const HighsInt kHighsOptionTypeInt = 1;
-const HighsInt kHighsOptionTypeDouble = 2;
-const HighsInt kHighsOptionTypeString = 3;
-
-const HighsInt kHighsInfoTypeInt64 = -1;
-const HighsInt kHighsInfoTypeInt = 1;
-const HighsInt kHighsInfoTypeDouble = 2;
-
-const HighsInt kHighsObjSenseMinimize = 1;
-const HighsInt kHighsObjSenseMaximize = -1;
-
-const HighsInt kHighsMatrixFormatColwise = 1;
-const HighsInt kHighsMatrixFormatRowwise = 2;
-
-const HighsInt kHighsHessianFormatTriangular = 1;
-const HighsInt kHighsHessianFormatSquare = 2;
-
-const HighsInt kHighsSolutionStatusNone = 0;
-const HighsInt kHighsSolutionStatusInfeasible = 1;
-const HighsInt kHighsSolutionStatusFeasible = 2;
-
-const HighsInt kHighsBasisValidityInvalid = 0;
-const HighsInt kHighsBasisValidityValid = 1;
-
-const HighsInt kHighsPresolveStatusNotPresolved = -1;
-const HighsInt kHighsPresolveStatusNotReduced = 0;
-const HighsInt kHighsPresolveStatusInfeasible = 1;
-const HighsInt kHighsPresolveStatusUnboundedOrInfeasible = 2;
-const HighsInt kHighsPresolveStatusReduced = 3;
-const HighsInt kHighsPresolveStatusReducedToEmpty = 4;
-const HighsInt kHighsPresolveStatusTimeout = 5;
-const HighsInt kHighsPresolveStatusNullError = 6;
-const HighsInt kHighsPresolveStatusOptionsError = 7;
-const HighsInt kHighsPresolveStatusOutOfMemory = 8;
-
-const HighsInt kHighsModelStatusNotset = 0;
-const HighsInt kHighsModelStatusLoadError = 1;
-const HighsInt kHighsModelStatusModelError = 2;
-const HighsInt kHighsModelStatusPresolveError = 3;
-const HighsInt kHighsModelStatusSolveError = 4;
-const HighsInt kHighsModelStatusPostsolveError = 5;
-const HighsInt kHighsModelStatusModelEmpty = 6;
-const HighsInt kHighsModelStatusOptimal = 7;
-const HighsInt kHighsModelStatusInfeasible = 8;
-const HighsInt kHighsModelStatusUnboundedOrInfeasible = 9;
-const HighsInt kHighsModelStatusUnbounded = 10;
-const HighsInt kHighsModelStatusObjectiveBound = 11;
-const HighsInt kHighsModelStatusObjectiveTarget = 12;
-const HighsInt kHighsModelStatusTimeLimit = 13;
-const HighsInt kHighsModelStatusIterationLimit = 14;
-const HighsInt kHighsModelStatusUnknown = 15;
-const HighsInt kHighsModelStatusSolutionLimit = 16;
-const HighsInt kHighsModelStatusInterrupt = 17;
-
-const HighsInt kHighsBasisStatusLower = 0;
-const HighsInt kHighsBasisStatusBasic = 1;
-const HighsInt kHighsBasisStatusUpper = 2;
-const HighsInt kHighsBasisStatusZero = 3;
-const HighsInt kHighsBasisStatusNonbasic = 4;
-
-const HighsInt kHighsCallbackLogging = 0;
-const HighsInt kHighsCallbackSimplexInterrupt = 1;
-const HighsInt kHighsCallbackIpmInterrupt = 2;
-const HighsInt kHighsCallbackMipSolution = 3;
-const HighsInt kHighsCallbackMipImprovingSolution = 4;
-const HighsInt kHighsCallbackMipLogging = 5;
-const HighsInt kHighsCallbackMipInterrupt = 6;
-const HighsInt kHighsCallbackMipGetCutPool = 7;
-const HighsInt kHighsCallbackMipDefineLazyConstraints = 8;
-const HighsInt kHighsCallbackCallbackMipUserSolution = 9;
-
-const char* const kHighsCallbackDataOutLogTypeName = "log_type";
-const char* const kHighsCallbackDataOutRunningTimeName = "running_time";
-const char* const kHighsCallbackDataOutSimplexIterationCountName =
-    "simplex_iteration_count";
-const char* const kHighsCallbackDataOutIpmIterationCountName =
-    "ipm_iteration_count";
-const char* const kHighsCallbackDataOutPdlpIterationCountName =
-    "pdlp_iteration_count";
-const char* const kHighsCallbackDataOutObjectiveFunctionValueName =
-    "objective_function_value";
-const char* const kHighsCallbackDataOutMipNodeCountName = "mip_node_count";
-const char* const kHighsCallbackDataOutMipTotalLpIterationsName =
-    "mip_total_lp_iterations";
-const char* const kHighsCallbackDataOutMipPrimalBoundName = "mip_primal_bound";
-const char* const kHighsCallbackDataOutMipDualBoundName = "mip_dual_bound";
-const char* const kHighsCallbackDataOutMipGapName = "mip_gap";
-const char* const kHighsCallbackDataOutMipSolutionName = "mip_solution";
-const char* const kHighsCallbackDataOutCutpoolNumColName = "cutpool_num_col";
-const char* const kHighsCallbackDataOutCutpoolNumCutName = "cutpool_num_cut";
-const char* const kHighsCallbackDataOutCutpoolNumNzName = "cutpool_num_nz";
-const char* const kHighsCallbackDataOutCutpoolStartName = "cutpool_start";
-const char* const kHighsCallbackDataOutCutpoolIndexName = "cutpool_index";
-const char* const kHighsCallbackDataOutCutpoolValueName = "cutpool_value";
-const char* const kHighsCallbackDataOutCutpoolLowerName = "cutpool_lower";
-const char* const kHighsCallbackDataOutCutpoolUpperName = "cutpool_upper";
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+extern const HighsInt kHighsMaximumStringLength;
+
+extern const HighsInt kHighsStatusError;
+extern const HighsInt kHighsStatusOk;
+extern const HighsInt kHighsStatusWarning;
+
+extern const HighsInt kHighsVarTypeContinuous;
+extern const HighsInt kHighsVarTypeInteger;
+extern const HighsInt kHighsVarTypeSemiContinuous;
+extern const HighsInt kHighsVarTypeSemiInteger;
+extern const HighsInt kHighsVarTypeImplicitInteger;
+
+extern const HighsInt kHighsOptionTypeBool;
+extern const HighsInt kHighsOptionTypeInt;
+extern const HighsInt kHighsOptionTypeDouble;
+extern const HighsInt kHighsOptionTypeString;
+
+extern const HighsInt kHighsInfoTypeInt64;
+extern const HighsInt kHighsInfoTypeInt;
+extern const HighsInt kHighsInfoTypeDouble;
+
+extern const HighsInt kHighsObjSenseMinimize;
+extern const HighsInt kHighsObjSenseMaximize;
+
+extern const HighsInt kHighsMatrixFormatColwise;
+extern const HighsInt kHighsMatrixFormatRowwise;
+
+extern const HighsInt kHighsHessianFormatTriangular;
+extern const HighsInt kHighsHessianFormatSquare;
+
+extern const HighsInt kHighsSolutionStatusNone;
+extern const HighsInt kHighsSolutionStatusInfeasible;
+extern const HighsInt kHighsSolutionStatusFeasible;
+
+extern const HighsInt kHighsBasisValidityInvalid;
+extern const HighsInt kHighsBasisValidityValid;
+
+extern const HighsInt kHighsPresolveStatusNotPresolved;
+extern const HighsInt kHighsPresolveStatusNotReduced;
+extern const HighsInt kHighsPresolveStatusInfeasible;
+extern const HighsInt kHighsPresolveStatusUnboundedOrInfeasible;
+extern const HighsInt kHighsPresolveStatusReduced;
+extern const HighsInt kHighsPresolveStatusReducedToEmpty;
+extern const HighsInt kHighsPresolveStatusTimeout;
+extern const HighsInt kHighsPresolveStatusNullError;
+extern const HighsInt kHighsPresolveStatusOptionsError;
+extern const HighsInt kHighsPresolveStatusOutOfMemory;
+
+extern const HighsInt kHighsModelStatusNotset;
+extern const HighsInt kHighsModelStatusLoadError;
+extern const HighsInt kHighsModelStatusModelError;
+extern const HighsInt kHighsModelStatusPresolveError;
+extern const HighsInt kHighsModelStatusSolveError;
+extern const HighsInt kHighsModelStatusPostsolveError;
+extern const HighsInt kHighsModelStatusModelEmpty;
+extern const HighsInt kHighsModelStatusOptimal;
+extern const HighsInt kHighsModelStatusInfeasible;
+extern const HighsInt kHighsModelStatusUnboundedOrInfeasible;
+extern const HighsInt kHighsModelStatusUnbounded;
+extern const HighsInt kHighsModelStatusObjectiveBound;
+extern const HighsInt kHighsModelStatusObjectiveTarget;
+extern const HighsInt kHighsModelStatusTimeLimit;
+extern const HighsInt kHighsModelStatusIterationLimit;
+extern const HighsInt kHighsModelStatusUnknown;
+extern const HighsInt kHighsModelStatusSolutionLimit;
+extern const HighsInt kHighsModelStatusInterrupt;
+
+extern const HighsInt kHighsBasisStatusLower;
+extern const HighsInt kHighsBasisStatusBasic;
+extern const HighsInt kHighsBasisStatusUpper;
+extern const HighsInt kHighsBasisStatusZero;
+extern const HighsInt kHighsBasisStatusNonbasic;
+
+extern const HighsInt kHighsCallbackLogging;
+extern const HighsInt kHighsCallbackSimplexInterrupt;
+extern const HighsInt kHighsCallbackIpmInterrupt;
+extern const HighsInt kHighsCallbackMipSolution;
+extern const HighsInt kHighsCallbackMipImprovingSolution;
+extern const HighsInt kHighsCallbackMipLogging;
+extern const HighsInt kHighsCallbackMipInterrupt;
+extern const HighsInt kHighsCallbackMipGetCutPool;
+extern const HighsInt kHighsCallbackMipDefineLazyConstraints;
+extern const HighsInt kHighsCallbackCallbackMipUserSolution;
+
+extern const char* const kHighsCallbackDataOutLogTypeName;
+extern const char* const kHighsCallbackDataOutRunningTimeName;
+extern const char* const kHighsCallbackDataOutSimplexIterationCountName;
+extern const char* const kHighsCallbackDataOutIpmIterationCountName;
+extern const char* const kHighsCallbackDataOutPdlpIterationCountName;
+extern const char* const kHighsCallbackDataOutObjectiveFunctionValueName;
+extern const char* const kHighsCallbackDataOutMipNodeCountName;
+extern const char* const kHighsCallbackDataOutMipTotalLpIterationsName;
+extern const char* const kHighsCallbackDataOutMipPrimalBoundName;
+extern const char* const kHighsCallbackDataOutMipDualBoundName;
+extern const char* const kHighsCallbackDataOutMipGapName;
+extern const char* const kHighsCallbackDataOutMipSolutionName;
+extern const char* const kHighsCallbackDataOutCutpoolNumColName;
+extern const char* const kHighsCallbackDataOutCutpoolNumCutName;
+extern const char* const kHighsCallbackDataOutCutpoolNumNzName;
+extern const char* const kHighsCallbackDataOutCutpoolStartName;
+extern const char* const kHighsCallbackDataOutCutpoolIndexName;
+extern const char* const kHighsCallbackDataOutCutpoolValueName;
+extern const char* const kHighsCallbackDataOutCutpoolLowerName;
+extern const char* const kHighsCallbackDataOutCutpoolUpperName;
+
+
 
 /**
  * Formulate and solve a linear program using HiGHS.
