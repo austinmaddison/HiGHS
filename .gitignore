@@ -24,7 +24,7 @@ local.properties
 # External tool builders
 .externalToolBuilders/
 
-# Locally stored "Eclipse launch configurations"
+# Locally stored Eclipse launch configurations
 *.launch
 
 # CDT-specific
@@ -294,3 +294,12 @@ Options.md
 
 build-latest
 CMakeFiles
+
+build-windows-x64
+build-linux-x64 
+build-android-arm64
+build-android-arm32
+build-android-x86
+build-android-x64
+build-ios-arm64
+build-macos-universal
