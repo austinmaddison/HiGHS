@@ -303,3 +303,5 @@ build-android-x86
 build-android-x64
 build-ios-arm64
 build-macos-universal
+build-ios-simulator-x64
+build-ios-simulator-arm64

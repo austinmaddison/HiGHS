@@ -4,7 +4,7 @@ echo "Cleaning up source directory..."
 rm -f CMakeCache.txt
 rm -rf CMakeFiles/
 
-platforms=("windows-x64" "linux-x64" "android-arm64" "android-arm32" "android-x86" "android-x64" "ios-arm64" "macos-universal")
+platforms=("windows-x64" "linux-x64" "android-arm64" "android-arm32" "android-x86" "android-x64" "ios-arm64" "ios-simulator-x64" "ios-simulator-arm64" "macos-universal")
 
 for platform in "${platforms[@]}"; do
     echo "Building for $platform..."

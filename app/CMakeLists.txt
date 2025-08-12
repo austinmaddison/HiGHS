@@ -47,9 +47,16 @@ if(FAST_BUILD)
     endif()
 
     # install the binary
-    install(TARGETS highs-bin 
-      EXPORT highs-targets
-      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        install(TARGETS highs-bin 
+          EXPORT highs-targets
+          BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}
+          RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    else()
+        install(TARGETS highs-bin 
+          EXPORT highs-targets
+          RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
 
     if(BUILD_TESTING)
       if (APPLE)
