@@ -305,3 +305,6 @@ build-ios-arm64
 build-macos-universal
 build-ios-simulator-x64
 build-ios-simulator-arm64
+
+# Build configuration files (contains local paths)
+.build_config.json
