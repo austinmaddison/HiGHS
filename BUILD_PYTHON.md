@@ -7,6 +7,7 @@ This Python script replaces the bash build scripts (`build-all.sh`, `build-ios.s
 - Python 3.6+
 - CMake
 - Platform-specific build tools (Visual Studio, Xcode, Android NDK, etc.)
+- Set path to android NDK if compiling for android, example: `./build.py build --ndk-path ~/Android/sdk/ndk/29.0.13846066`
 
 ## Usage
 
