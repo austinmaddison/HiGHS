@@ -1,0 +1,118 @@
+name: Build libhighs for iOS (XCFramework)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - ".github/workflows/build-ios.yml"
+      - "src/**"
+
+jobs:
+  ios:
+    name: iOS (${{ matrix.platform }})
+    runs-on: macos-14
+    strategy:
+      matrix:
+        include:
+          - platform: device
+            preset: ios-arm64
+            output_name: ios-arm64-device
+            lib_path: build-ios-arm64/Release/lib/libhighs.a
+          # - platform: simulator-x64
+          #   preset: ios-simulator-x64
+          #   output_name: ios-simulator-x64
+          #   lib_path: build-ios-simulator-x64/Release/lib/libhighs.a
+          - platform: simulator-arm64
+            preset: ios-simulator-arm64
+            output_name: ios-simulator-arm64
+            lib_path: build-ios-simulator-arm64/Release/lib/libhighs.a
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Patch presets (optional) - avoid hard-coded SDK names
+        run: |
+          # If your presets pin CMAKE_OSX_SYSROOT to e.g. "iphoneos18.5",
+          # replace with "iphoneos" / "iphonesimulator" for CI portability.
+          sed -i.bak 's/iphoneos[0-9\.]*/iphoneos/g' CMakePresets.json || true
+          sed -i.bak 's/iphonesimulator[0-9\.]*/iphonesimulator/g' CMakePresets.json || true
+
+      - name: Configure (${{ matrix.platform }})
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build (${{ matrix.platform }})
+        run: cmake --build --preset ${{ matrix.preset }} --config Release
+
+      - name: Upload library artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output_name }}
+          path: ${{ matrix.lib_path }}
+
+  assemble:
+    name: Assemble XCFramework
+    needs: [ios]
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: _artifacts
+
+      - name: List downloaded artifacts
+        run: find _artifacts -type f -name "*.a" | sort
+
+      - name: Assemble XCFramework
+        run: |
+          chmod +x ./.github/scripts/assemble_xcframework.sh
+          ./.github/scripts/assemble_xcframework.sh \
+            --device-lib _artifacts/ios-arm64-device/libhighs.a \
+            --sim-libs _artifacts/ios-simulator-arm64/libhighs.a \
+            --name LibHighs \
+            --out out-ios
+
+      - name: Upload XCFramework artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcframework
+          path: out-ios/
+
+  package:
+    name: Package plugin layout
+    needs: [assemble]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-xcframework
+          path: _artifacts
+
+      - name: Prepare combined layout
+        run: |
+          set -e
+          # copy iOS xcframework
+          mkdir -p pkg/ios
+          
+          cp -R _artifacts/LibHighs.xcframework pkg/ios/
+
+      - name: Zip deliverable
+        run: |
+          (cd pkg && zip -r ../dart-highs-prebuilt-lib-ios.zip .)
+
+      - name: Upload combined artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-highs-prebuilt-lib-ios
+          path: dart-highs-prebuilt-lib-ios.zip
