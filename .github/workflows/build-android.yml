@@ -10,8 +10,8 @@ on:
       - "src/**"
 
 jobs:
-  android:
-    name: Android ABIs
+  build:
+    name: Android (${{ matrix.preset }})
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -47,42 +47,67 @@ jobs:
       - name: Build (${{ matrix.preset }})
         run: cmake --build --preset ${{ matrix.preset }} --config Release
 
-      - name: Collect .so into plugin layout
-        run: |
-          set -e
-          OUT=out-android/${{ matrix.preset }}
-          mkdir -p $OUT/android/src/main/jniLibs
-          case "${{ matrix.preset }}" in
-            android-arm64) ABI=arm64-v8a ;;
-            android-arm32) ABI=armeabi-v7a ;;
-            android-x64)   ABI=x86_64 ;;
-            android-x86)   ABI=x86 ;;
-          esac
-          mkdir -p $OUT/android/src/main/jniLibs/$ABI
-          # Adjust the path below if your target name / output dir differs
-          cp build-${{ matrix.preset }}/lib/libhighs.so $OUT/android/src/main/jniLibs/$ABI/
-
-      - name: Upload artifact (${{ matrix.preset }})
+      - name: Upload library artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-${{ matrix.preset }}
-          path: out-android/${{ matrix.preset }}
+          name: ${{ matrix.preset }}
+          path: build-${{ matrix.preset }}/lib/libhighs.so
+
+  assemble:
+    name: Assemble Android Libraries
+    needs: [build]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: _artifacts
+
+      - name: List downloaded artifacts
+        run: find _artifacts -type f -name "*.so" | sort
+
+      - name: Assemble Android plugin layout
+        run: |
+          set -e
+          mkdir -p out-android/android/src/main/jniLibs
+          
+          # Map preset names to Android ABI names and copy libraries
+          declare -A abi_map=(
+            ["android-arm64"]="arm64-v8a"
+            ["android-arm32"]="armeabi-v7a"
+            ["android-x64"]="x86_64"
+            ["android-x86"]="x86"
+          )
+          
+          for preset in android-arm64 android-arm32 android-x64 android-x86; do
+            abi=${abi_map[$preset]}
+            mkdir -p out-android/android/src/main/jniLibs/$abi
+            cp _artifacts/$preset/libhighs.so out-android/android/src/main/jniLibs/$abi/
+            echo "Copied $preset -> $abi"
+          done
+
+      - name: Upload Android bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-bundle
+          path: out-android/
 
   package:
     name: Package plugin layout
-    needs: [android]
+    needs: [assemble]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/download-artifact@v4
         with:
+          name: android-bundle
           path: _artifacts
 
       - name: Prepare combined layout
         run: |
           set -e
+          # copy Android libraries
           mkdir -p pkg/android/src/main/jniLibs
-          # copy ABIs
-          find _artifacts -type d -name jniLibs -exec rsync -a {}/ pkg/android/src/main/jniLibs/ \;
+          cp -R _artifacts/android/src/main/jniLibs/* pkg/android/src/main/jniLibs/
 
       - name: Zip deliverable
         run: |
@@ -93,3 +118,25 @@ jobs:
         with:
           name: dart-highs-prebuilt-lib-android
           path: dart-highs-prebuilt-lib-android.zip
+
+      - name: Create Android release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: android-v${{ github.run_number }}-${{ github.sha }}
+          name: HiGHS Android Libraries
+          body: |
+            HiGHS prebuilt libraries for Android platforms
+            
+            This release contains native libraries for all Android ABIs:
+            - arm64-v8a (Android 64-bit ARM)
+            - armeabi-v7a (Android 32-bit ARM)
+            - x86_64 (Android 64-bit Intel)
+            - x86 (Android 32-bit Intel)
+            
+            **Usage:**
+            Extract the zip file and integrate the `android/src/main/jniLibs` structure into your Android project.
+            
+            Generated from commit: ${{ github.sha }}
+          files: dart-highs-prebuilt-lib-android.zip
+          draft: false
+          prerelease: false

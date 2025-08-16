@@ -10,7 +10,7 @@ on:
       - "src/**"
 
 jobs:
-  ios:
+  build:
     name: iOS (${{ matrix.platform }})
     runs-on: macos-14
     strategy:
@@ -20,10 +20,6 @@ jobs:
             preset: ios-arm64
             output_name: ios-arm64-device
             lib_path: build-ios-arm64/Release/lib/libhighs.a
-          # - platform: simulator-x64
-          #   preset: ios-simulator-x64
-          #   output_name: ios-simulator-x64
-          #   lib_path: build-ios-simulator-x64/Release/lib/libhighs.a
           - platform: simulator-arm64
             preset: ios-simulator-arm64
             output_name: ios-simulator-arm64
@@ -61,7 +57,7 @@ jobs:
 
   assemble:
     name: Assemble XCFramework
-    needs: [ios]
+    needs: [build]
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -76,8 +72,7 @@ jobs:
 
       - name: Assemble XCFramework
         run: |
-          chmod +x ./.github/scripts/assemble_xcframework.sh
-          ./.github/scripts/assemble_xcframework.sh \
+          python3 ./.github/scripts/assemble_xcframework.py \
             --device-lib _artifacts/ios-arm64-device/libhighs.a \
             --sim-libs _artifacts/ios-simulator-arm64/libhighs.a \
             --name LibHighs \
@@ -116,3 +111,25 @@ jobs:
         with:
           name: dart-highs-prebuilt-lib-ios
           path: dart-highs-prebuilt-lib-ios.zip
+
+      - name: Create iOS release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ios-v${{ github.run_number }}-${{ github.sha }}
+          name: HiGHS iOS XCFramework
+          body: |
+            HiGHS prebuilt XCFramework for iOS platforms
+            
+            This release contains:
+            - iOS device library (arm64)
+            - iOS simulator library (arm64)
+            - XCFramework combining both for easy integration
+            
+            **Usage:**
+            Extract the zip file and add the `ios/LibHighs.xcframework` to your iOS project.
+            The XCFramework supports both device and simulator builds.
+            
+            Generated from commit: ${{ github.sha }}
+          files: dart-highs-prebuilt-lib-ios.zip
+          draft: false
+          prerelease: false

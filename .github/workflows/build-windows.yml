@@ -1,0 +1,83 @@
+name: Build libhighs for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - ".github/workflows/build-windows.yml"
+      - "src/**"
+
+jobs:
+  build:
+    name: Windows x64
+    runs-on: windows-2022
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Visual Studio
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Configure (Windows x64)
+        run: cmake --preset windows-x64
+
+      - name: Build (Windows x64)
+        run: cmake --build --preset windows-x64 --config Release
+
+      - name: Upload library artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: build-windows-x64/Release/highs.dll
+
+  package:
+    name: Package plugin layout
+    needs: [build]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x64
+          path: _artifacts
+
+      - name: Prepare combined layout
+        run: |
+          set -e
+          # copy Windows library
+          mkdir -p pkg/windows
+          
+          cp _artifacts/highs.dll pkg/windows/
+
+      - name: Zip deliverable
+        run: |
+          (cd pkg && zip -r ../dart-highs-prebuilt-lib-windows.zip .)
+
+      - name: Upload combined artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-highs-prebuilt-lib-windows
+          path: dart-highs-prebuilt-lib-windows.zip
+
+      - name: Create Windows release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: windows-v${{ github.run_number }}-${{ github.sha }}
+          name: HiGHS Windows x64 Library
+          body: |
+            HiGHS prebuilt library for Windows x64
+            
+            This release contains:
+            - Windows x64 DLL ready for linking
+            - Compatible with Visual Studio 2019+ and mingw-w64
+            
+            **Usage:**
+            Extract the zip file and link against the `windows/highs.dll` library.
+            Make sure to distribute the DLL with your application.
+            
+            Generated from commit: ${{ github.sha }}
+          files: dart-highs-prebuilt-lib-windows.zip
+          draft: false
+          prerelease: false

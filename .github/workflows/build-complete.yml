@@ -1,0 +1,49 @@
+name: Build All HiGHS Platforms (Separate Releases)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for triggering all platform builds'
+        required: false
+        default: 'Manual trigger for all platforms'
+
+jobs:
+  # Trigger all platform builds - each will create their own release
+  build-ios:
+    uses: ./.github/workflows/build-ios.yml
+  
+  build-android:  
+    uses: ./.github/workflows/build-android.yml
+    
+  build-macos:
+    uses: ./.github/workflows/build-macos.yml
+    
+  build-windows:
+    uses: ./.github/workflows/build-windows.yml
+    
+  build-linux:
+    uses: ./.github/workflows/build-linux.yml
+    
+  build-includes:
+    uses: ./.github/workflows/build-includes.yml
+
+  summary:
+    name: Build Summary
+    needs: [build-ios, build-android, build-macos, build-windows, build-linux, build-includes]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Summary
+        run: |
+          echo "✅ All platform builds completed successfully!"
+          echo ""
+          echo "Individual releases have been created for:"
+          echo "- 📱 iOS: XCFramework (device + simulator)"
+          echo "- 🤖 Android: Native libraries for all ABIs"
+          echo "- 🍎 macOS: Universal binary (arm64 + x86_64)"
+          echo "- 🪟 Windows: x64 DLL"
+          echo "- 🐧 Linux: x64 shared library"
+          echo "- 📄 Includes: C++ headers"
+          echo ""
+          echo "Each platform has its own tagged release for platform-specific package managers."
+          echo "Reason: ${{ github.event.inputs.reason || 'Automated build' }}"

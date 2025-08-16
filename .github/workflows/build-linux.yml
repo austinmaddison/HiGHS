@@ -1,0 +1,88 @@
+name: Build libhighs for Linux
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - ".github/workflows/build-linux.yml"
+      - "src/**"
+
+jobs:
+  build:
+    name: Linux x64
+    runs-on: ubuntu-22.04
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Configure (Linux x64)
+        run: cmake --preset linux-x64
+
+      - name: Build (Linux x64)
+        run: cmake --build --preset linux-x64 --config Release
+
+      - name: Upload library artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: build-linux-x64/libhighs.so
+
+  package:
+    name: Package plugin layout
+    needs: [build]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-x64
+          path: _artifacts
+
+      - name: Prepare combined layout
+        run: |
+          set -e
+          # copy Linux library
+          mkdir -p pkg/linux
+          
+          cp _artifacts/libhighs.so pkg/linux/
+
+      - name: Zip deliverable
+        run: |
+          (cd pkg && zip -r ../dart-highs-prebuilt-lib-linux.zip .)
+
+      - name: Upload combined artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-highs-prebuilt-lib-linux
+          path: dart-highs-prebuilt-lib-linux.zip
+
+      - name: Create Linux release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: linux-v${{ github.run_number }}-${{ github.sha }}
+          name: HiGHS Linux x64 Library
+          body: |
+            HiGHS prebuilt library for Linux x64
+            
+            This release contains:
+            - Linux x64 shared library (.so) ready for linking
+            - Compatible with most Linux distributions
+            
+            **Usage:**
+            Extract the zip file and link against the `linux/libhighs.so` library.
+            Make sure the library is in your LD_LIBRARY_PATH at runtime.
+            
+            Generated from commit: ${{ github.sha }}
+          files: dart-highs-prebuilt-lib-linux.zip
+          draft: false
+          prerelease: false

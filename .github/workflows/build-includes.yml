@@ -1,0 +1,100 @@
+name: Build HiGHS Includes Package
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - ".github/workflows/build-includes.yml"
+      - "highs/**"
+
+jobs:
+  package-includes:
+    name: Package HiGHS Includes
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build
+
+      - name: Configure project to generate HConfig.h
+        run: |
+          cmake -B build-temp -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DFAST_BUILD=ON
+
+      - name: Package includes
+        run: |
+          set -e
+          mkdir -p pkg/include/highs
+          
+          # Copy main header
+          cp highs/Highs.h pkg/include/highs/
+          
+          # Copy generated config header
+          cp build-temp/HConfig.h pkg/include/highs/
+          
+          # Copy all other headers maintaining directory structure
+          cd highs
+          find . -name "*.h" -o -name "*.hpp" | while read -r header; do
+            # Skip the main Highs.h as it's already copied
+            if [[ "$header" != "./Highs.h" ]]; then
+              dir=$(dirname "$header")
+              mkdir -p "../pkg/include/highs/$dir"
+              cp "$header" "../pkg/include/highs/$header"
+            fi
+          done
+          cd ..
+          
+          # Copy extern headers that are referenced
+          mkdir -p pkg/include/highs/extern/filereaderlp
+          cp extern/filereaderlp/builder.hpp pkg/include/highs/extern/filereaderlp/
+          cp extern/filereaderlp/def.hpp pkg/include/highs/extern/filereaderlp/
+          cp extern/filereaderlp/model.hpp pkg/include/highs/extern/filereaderlp/
+          cp extern/filereaderlp/reader.hpp pkg/include/highs/extern/filereaderlp/
+          
+          mkdir -p pkg/include/highs/extern/pdqsort
+          cp extern/pdqsort/pdqsort.h pkg/include/highs/extern/pdqsort/
+          
+          mkdir -p pkg/include/highs/extern/zstr
+          cp extern/zstr/strict_fstream.hpp pkg/include/highs/extern/zstr/
+          cp extern/zstr/zstr.hpp pkg/include/highs/extern/zstr/
+
+      - name: Zip includes package
+        run: |
+          (cd pkg && zip -r ../highs-includes.zip .)
+
+      - name: Upload includes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: highs-includes
+          path: highs-includes.zip
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: includes-v${{ github.run_number }}-${{ github.sha }}
+          name: HiGHS Includes Package
+          body: |
+            HiGHS C++ header files package
+            
+            This release contains all the header files needed to compile against HiGHS.
+            
+            **Contents:**
+            - Main API header: `include/highs/Highs.h`
+            - Generated config: `include/highs/HConfig.h` 
+            - All supporting headers with proper directory structure
+            - External dependencies headers
+            
+            **Usage:**
+            Extract the zip file and add `include/` to your compiler's include path.
+            
+            Generated from commit: ${{ github.sha }}
+          files: highs-includes.zip
+          draft: false
+          prerelease: false

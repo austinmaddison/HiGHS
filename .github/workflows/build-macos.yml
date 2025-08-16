@@ -1,0 +1,82 @@
+name: Build libhighs for macOS
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - ".github/workflows/build-macos.yml"
+      - "src/**"
+
+jobs:
+  build:
+    name: macOS Universal
+    runs-on: macos-14
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Configure (macOS Universal)
+        run: cmake --preset macos-universal
+
+      - name: Build (macOS Universal)
+        run: cmake --build --preset macos-universal --config Release
+
+      - name: Upload library artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: build-macos-universal/libhighs.dylib
+
+  package:
+    name: Package plugin layout
+    needs: [build]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-universal
+          path: _artifacts
+
+      - name: Prepare combined layout
+        run: |
+          set -e
+          # copy macOS library
+          mkdir -p pkg/macos
+          
+          cp _artifacts/libhighs.dylib pkg/macos/
+
+      - name: Zip deliverable
+        run: |
+          (cd pkg && zip -r ../dart-highs-prebuilt-lib-macos.zip .)
+
+      - name: Upload combined artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-highs-prebuilt-lib-macos
+          path: dart-highs-prebuilt-lib-macos.zip
+
+      - name: Create macOS release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: macos-v${{ github.run_number }}-${{ github.sha }}
+          name: HiGHS macOS Universal Library
+          body: |
+            HiGHS prebuilt universal library for macOS
+            
+            This release contains:
+            - Universal binary supporting both Apple Silicon (arm64) and Intel (x86_64)
+            - Dynamic library (.dylib) ready for linking
+            
+            **Usage:**
+            Extract the zip file and link against the `macos/libhighs.dylib` library.
+            
+            Generated from commit: ${{ github.sha }}
+          files: dart-highs-prebuilt-lib-macos.zip
+          draft: false
+          prerelease: false
