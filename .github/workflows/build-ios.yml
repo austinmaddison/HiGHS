@@ -38,6 +38,9 @@ jobs:
       - name: Install Ninja
         run: brew install ninja
 
+      - name: Select Xcode 16.2 (supports iOS 18.2 SDK)
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
       - name: Show Xcode version
         run: xcodebuild -version
 
@@ -67,6 +70,9 @@ jobs:
 
       - name: Install Ninja
         run: brew install ninja
+
+      - name: Select Xcode 16.2 (supports iOS 18.2 SDK)
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
       - name: Build XCFramework using build script
         run: |
