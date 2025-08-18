@@ -53,36 +53,37 @@ jobs:
         with:
           name: ${{ matrix.platform }}
           path: highs_patched/build/${{ matrix.platform }}/libhighs.a
-
+          
   build-xcframework:
     name: iOS XCFramework
     runs-on: macos-14
     needs: [build-individual]
     steps:
-      - uses: actions/checkout@v4
+      - name: Download individual libraries
+        uses: actions/download-artifact@v4
         with:
-          submodules: recursive
+          path: artifacts
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Create directories
+        run: mkdir -p xcframework/ios-arm64 xcframework/ios-simulator-arm64
 
-      - name: Install Ninja
-        run: brew install ninja
-
-      - name: Select Xcode 16.2 (supports iOS 18.2 SDK)
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
-
-      - name: Build XCFramework using build script
+      - name: Copy libraries
         run: |
-          python build.py build ios --config ${{ env.BUILD_CONFIG }}
+          cp artifacts/ios-arm64/libhighs.a xcframework/ios-arm64/
+          cp artifacts/ios-simulator-arm64/libhighs.a xcframework/ios-simulator-arm64/
+
+      - name: Create XCFramework
+        run: |
+          xcodebuild -create-xcframework \
+            -library xcframework/ios-arm64/libhighs.a \
+            -library xcframework/ios-simulator-arm64/libhighs.a \
+            -output xcframework/${{ env.XCFRAMEWORK_NAME }}.xcframework
 
       - name: Upload XCFramework
         uses: actions/upload-artifact@v4
         with:
           name: ios-xcframework
-          path: highs_patched/build/ios-xcframework/LibHighs.xcframework
+          path: xcframework
 
   package:
     name: Package iOS Release
@@ -110,10 +111,31 @@ jobs:
 
       - name: Package XCFramework
         run: |
-          mkdir -p pkg-xcframework/ios
-          cp -r _artifacts/ios-xcframework/LibHighs.xcframework pkg-xcframework/ios/${{ env.XCFRAMEWORK_NAME }}.xcframework
+          # Create CocoaPods-friendly structure
+          mkdir -p pkg-xcframework
+          cp -r _artifacts/ios-xcframework/${{ env.XCFRAMEWORK_NAME }}.xcframework pkg-xcframework/
           
-          # Create zip for XCFramework
+          # Create podspec file
+          cat > pkg-xcframework/${{ env.XCFRAMEWORK_NAME }}.podspec << EOL
+          Pod::Spec.new do |s|
+            s.name             = '${{ env.XCFRAMEWORK_NAME }}'
+            s.version          = '${{ github.run_number }}.${{ github.sha }}'
+            s.summary          = 'HiGHS linear optimization solver'
+            s.description      = 'HiGHS high performance linear optimization solver packaged for iOS'
+            s.homepage         = 'https://github.com/${{ github.repository }}'
+            s.license          = { :type => 'MIT' }
+            s.author           = { 'HiGHS' => 'https://github.com/${{ github.repository }}' }
+            s.source           = { :http => 'https://github.com/${{ github.repository }}/releases/download/ios-v${{ github.run_number }}-${{ github.sha }}/${{ env.PACKAGE_NAME }}.zip' }
+            s.platform         = :ios, '12.0'
+            s.ios.deployment_target = '12.0'
+            s.ios.vendored_frameworks = '${{ env.XCFRAMEWORK_NAME }}.xcframework'
+            s.swift_version = '5.0'
+            s.pod_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => '' }
+            s.user_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => '' }
+          end
+          EOL
+          
+          # Create zip for XCFramework with proper CocoaPods structure
           (cd pkg-xcframework && zip -r ../${{ env.PACKAGE_NAME }}.zip .)
 
       - name: Upload individual package
@@ -140,15 +162,22 @@ jobs:
             
             **XCFramework (Recommended)**:
             - `${{ env.PACKAGE_NAME }}.zip` - Complete XCFramework supporting both device and simulator
-            - Ready to drag-and-drop into Xcode projects
+            - Ready for CocoaPods integration with Flutter
             
             **Individual Libraries**:
             - `${{ env.PACKAGE_NAME }}-individual.zip` - Separate .a files for each architecture
             - `ios-arm64/` - iOS device library (ARM64)
             - `ios-simulator-arm64/` - iOS simulator library (ARM64)
             
-            **Usage:**
-            For most users, download the XCFramework package and add `${{ env.XCFRAMEWORK_NAME }}.xcframework` to your iOS project.
+            **Usage with Flutter and CocoaPods:**
+            1. Download and extract the XCFramework package
+            2. In your Flutter app's iOS directory, create a Podfile if you don't have one
+            3. Add this to your Podfile:
+               ```ruby
+               pod '${{ env.XCFRAMEWORK_NAME }}', :path => 'path/to/extracted/package'
+               ```
+            4. Run `pod install`
+            5. In your Flutter app, use FFI to interact with the library
             
             Generated from commit: ${{ github.sha }}
             Build configuration: ${{ env.BUILD_CONFIG }}
