@@ -1,0 +1,301 @@
+name: Create Unified HiGHS Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: 'v1.0.0'
+      prerelease:
+        description: 'Prerelease'
+        required: true
+        type: boolean
+        default: false
+  workflow_run:
+    workflows:
+      - "Build libhighs for iOS"
+      - "Build libhighs for Android"
+      - "Build libhighs for macOS"
+      - "Build libhighs for Windows"
+      - "Build libhighs for Linux"
+      - "Build HiGHS Includes Package"
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  check-workflows:
+    name: Check all workflows completed successfully
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_run'
+    outputs:
+      all_success: ${{ steps.check-success.outputs.all_success }}
+      triggering_sha: ${{ steps.get-sha.outputs.sha }}
+      auto_version: ${{ steps.set-version.outputs.version }}
+    steps:
+      - name: Get triggering commit SHA
+        id: get-sha
+        run: echo "sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+
+      - name: Check all required workflows succeeded
+        id: check-success
+        env:
+          REPO: ${{ github.repository }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # IMPORTANT: Use workflow FILE NAMES, not display names
+          workflows_files=("build-ios.yml" "build-android.yml" "build-macos.yml" "build-windows.yml" "build-linux.yml" "build-includes.yml")
+          all_success=true
+          for wf in "${workflows_files[@]}"; do
+            echo "Checking workflow file: $wf for SHA $SHA"
+            run_data=$(curl -sS -H "Authorization: token $TOKEN" \
+              "https://api.github.com/repos/$REPO/actions/workflows/$wf/runs?head_sha=$SHA&per_page=1")
+            status=$(echo "$run_data" | jq -r '.workflow_runs[0].conclusion')
+            echo "Status for $wf: $status"
+            if [ "$status" != "success" ]; then
+              all_success=false
+              echo "Workflow $wf did not succeed (status: $status)"
+              break
+            fi
+          done
+          echo "all_success=$all_success" >> $GITHUB_OUTPUT
+
+      - name: Set auto version
+        id: set-version
+        run: |
+          DATE=$(date +'%Y%m%d')
+          SHORT_SHA=$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)
+          echo "version=v$DATE-$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "Auto-generated version: v$DATE-$SHORT_SHA"
+
+  wait-for-builds:
+    name: Wait for platform builds
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Wait for iOS workflow
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Build libhighs for iOS'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for Android workflow
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Build libhighs for Android'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for macOS workflow
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Build libhighs for macOS'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for Windows workflow
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Build libhighs for Windows'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for Linux workflow
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Build libhighs for Linux'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for Includes workflow
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Build HiGHS Includes Package'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+
+  create-release:
+    name: Create Unified Release
+    needs: [check-workflows, wait-for-builds]
+    if: |
+      always() &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'workflow_run' && needs.check-workflows.outputs.all_success == 'true'))
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Set version and target SHA
+        id: set-version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+            echo "PRERELEASE=${{ github.event.inputs.prerelease }}" >> $GITHUB_ENV
+            echo "TARGET_SHA=${{ github.sha }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${{ needs.check-workflows.outputs.auto_version }}" >> $GITHUB_ENV
+            echo "PRERELEASE=true" >> $GITHUB_ENV
+            echo "TARGET_SHA=${{ needs.check-workflows.outputs.triggering_sha }}" >> $GITHUB_ENV
+          fi
+          echo "Using VERSION=$VERSION, TARGET_SHA=$TARGET_SHA, PRERELEASE=$PRERELEASE"
+
+      # --- Download artifacts from the matching commit of each workflow ---
+      - name: Download iOS artifacts
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: build-ios.yml
+          commit: ${{ env.TARGET_SHA }}
+          workflow_conclusion: success
+          name: dart-highs-prebuilt-lib-ios
+          path: artifacts/ios
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          if_no_artifact_found: fail
+
+      - name: Download Android artifacts
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: build-android.yml
+          commit: ${{ env.TARGET_SHA }}
+          workflow_conclusion: success
+          name: dart-highs-prebuilt-lib-android
+          path: artifacts/android
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          if_no_artifact_found: fail
+
+      - name: Download Android JNI Bundle
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: build-android.yml
+          commit: ${{ env.TARGET_SHA }}
+          workflow_conclusion: success
+          name: android-jni-libs-bundle
+          path: artifacts/android-jni
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          if_no_artifact_found: fail
+
+      - name: Download macOS artifacts
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: build-macos.yml
+          commit: ${{ env.TARGET_SHA }}
+          workflow_conclusion: success
+          name: dart-highs-prebuilt-lib-macos
+          path: artifacts/macos
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          if_no_artifact_found: fail
+
+      - name: Download Windows artifacts
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: build-windows.yml
+          commit: ${{ env.TARGET_SHA }}
+          workflow_conclusion: success
+          name: dart-highs-prebuilt-lib-windows
+          path: artifacts/windows
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          if_no_artifact_found: fail
+
+      - name: Download Linux artifacts
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: build-linux.yml
+          commit: ${{ env.TARGET_SHA }}
+          workflow_conclusion: success
+          name: dart-highs-prebuilt-lib-linux
+          path: artifacts/linux
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          if_no_artifact_found: fail
+
+      - name: Download Includes artifacts
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: build-includes.yml
+          commit: ${{ env.TARGET_SHA }}
+          workflow_conclusion: success
+          name: highs-includes
+          path: artifacts/includes
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          if_no_artifact_found: fail
+
+      - name: List downloaded artifacts
+        run: find artifacts -type f | sort
+
+      - name: Rename files with version
+        run: |
+          mkdir -p release
+          cp artifacts/ios/dart-highs-prebuilt-lib-ios.zip           "release/dart-highs-prebuilt-lib-ios-${VERSION}.zip"
+          cp artifacts/android/dart-highs-prebuilt-lib-android.zip   "release/dart-highs-prebuilt-lib-android-${VERSION}.zip"
+          cp artifacts/android-jni/android-jni-libs-bundle.zip       "release/android-jni-libs-bundle-${VERSION}.zip"
+          cp artifacts/macos/dart-highs-prebuilt-lib-macos.zip       "release/dart-highs-prebuilt-lib-macos-${VERSION}.zip"
+          cp artifacts/windows/dart-highs-prebuilt-lib-windows.zip   "release/dart-highs-prebuilt-lib-windows-${VERSION}.zip"
+          cp artifacts/linux/dart-highs-prebuilt-lib-linux.zip       "release/dart-highs-prebuilt-lib-linux-${VERSION}.zip"
+          cp artifacts/includes/highs-includes.zip                   "release/highs-includes-${VERSION}.zip"
+
+      - name: Create unified release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: HiGHS ${{ env.VERSION }} Multi-Platform Release
+          prerelease: ${{ env.PRERELEASE }}
+          body: |
+            # HiGHS ${{ env.VERSION }}
+
+            Unified multi-platform release of the HiGHS linear optimization solver for various platforms.
+
+            ## Platform Libraries
+
+            ### Mobile
+            - **iOS**: `dart-highs-prebuilt-lib-ios-${{ env.VERSION }}.zip`
+              - XCFramework for iOS devices and simulators (arm64)
+              - CocoaPods compatible for Flutter integration
+
+            - **Android**: `dart-highs-prebuilt-lib-android-${{ env.VERSION }}.zip` and `android-jni-libs-bundle-${{ env.VERSION }}.zip`
+              - Native libraries for all Android ABIs (arm64-v8a, armeabi-v7a, x86_64, x86)
+              - JNI bundle ready for Android projects
+
+            ### Desktop
+            - **macOS**: `dart-highs-prebuilt-lib-macos-${{ env.VERSION }}.zip`
+              - Universal binary (arm64 + x86_64)
+
+            - **Windows**: `dart-highs-prebuilt-lib-windows-${{ env.VERSION }}.zip`
+              - x64 architecture
+
+            - **Linux**: `dart-highs-prebuilt-lib-linux-${{ env.VERSION }}.zip`
+              - x64 architecture
+
+            ### Development
+            - **C++ Headers**: `highs-includes-${{ env.VERSION }}.zip`
+              - All necessary headers for building against HiGHS
+
+            ## Integration
+
+            ### Flutter/Dart Integration
+            For Flutter projects, download the appropriate platform libraries and place them in your project's platform-specific directories.
+
+            ### iOS with CocoaPods (Flutter)
+            1. Extract the iOS package
+            2. In your iOS directory's Podfile:
+               ```ruby
+               pod 'LibHighs', :path => 'path/to/extracted/package'
+               ```
+
+            ### Android
+            Extract the JNI bundle to your Android project's `src/main/jniLibs/` directory.
+
+            ### Desktop platforms
+            Place the libraries in the appropriate system path or bundle with your application.
+
+            Generated from commit: ${{ env.TARGET_SHA }}
+          files: |
+            release/dart-highs-prebuilt-lib-ios-${{ env.VERSION }}.zip
+            release/dart-highs-prebuilt-lib-android-${{ env.VERSION }}.zip
+            release/android-jni-libs-bundle-${{ env.VERSION }}.zip
+            release/dart-highs-prebuilt-lib-macos-${{ env.VERSION }}.zip
+            release/dart-highs-prebuilt-lib-windows-${{ env.VERSION }}.zip
+            release/dart-highs-prebuilt-lib-linux-${{ env.VERSION }}.zip
+            release/highs-includes-${{ env.VERSION }}.zip
+          draft: false
