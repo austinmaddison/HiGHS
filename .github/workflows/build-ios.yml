@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}
-          path: highs_patched/build-${{ matrix.platform }}/libhighs.a
+          path: highs_patched/build/${{ matrix.platform }}/libhighs.a
 
   build-xcframework:
     name: iOS XCFramework
@@ -82,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-xcframework
-          path: highs_patched/build/ios-xcframework/highs.xcframework
+          path: highs_patched/build/ios-xcframework/LibHighs.xcframework
 
   package:
     name: Package iOS Release
@@ -111,7 +111,7 @@ jobs:
       - name: Package XCFramework
         run: |
           mkdir -p pkg-xcframework/ios
-          cp -r _artifacts/ios-xcframework/highs.xcframework pkg-xcframework/ios/${{ env.XCFRAMEWORK_NAME }}.xcframework
+          cp -r _artifacts/ios-xcframework/LibHighs.xcframework pkg-xcframework/ios/${{ env.XCFRAMEWORK_NAME }}.xcframework
           
           # Create zip for XCFramework
           (cd pkg-xcframework && zip -r ../${{ env.PACKAGE_NAME }}.zip .)

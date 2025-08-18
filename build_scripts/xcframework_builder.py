@@ -32,19 +32,32 @@ class XCFrameworkBuilder:
         
         # Define library paths using the configured build type
         library_paths = []
+        missing_libs = []
+ 
         for ios_platform in ios_platforms:
-            lib_path = (self.project_dir / "build" / ios_platform / self.build_config / "lib" / "libhighs.a").resolve()
-            library_paths.append(lib_path)
-        
+            possible_paths = [
+                (self.project_dir / "build" / ios_platform / self.build_config / "lib" / "libhighs.a"),
+                (self.project_dir / "build" / ios_platform / "libhighs.a")
+            ]
+            
+            found_path = None
+            for path in possible_paths:
+                if path.exists():
+                    found_path = path.resolve()
+                    library_paths.append(found_path)
+                    break
+            
+            if not found_path:
+                missing_libs.append(f"libhighs.a for {ios_platform}")
+
         # Check if all libraries exist
-        missing_libs = [path for path in library_paths if not path.exists()]
         if missing_libs:
             Logger.error("Missing library files:")
             for lib in missing_libs:
                 Logger.error(f"  {lib}")
             return False
         
-        xcframework_path = xcframework_dir / "highs.xcframework"
+        xcframework_path = xcframework_dir / "LibHighs.xcframework"
         
         # Remove existing XCFramework if it exists
         if xcframework_path.exists():

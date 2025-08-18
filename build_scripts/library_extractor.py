@@ -90,6 +90,47 @@ class LibraryExtractor:
                 final_path = build_dir / temp_lib.name.replace(f"temp_{platform}_", "")
                 shutil.move(temp_lib, final_path)
                 Logger.success(f"Extracted: {final_path.name}")
+
+            # Platform-specific cleanup and renaming
+            if "linux" in platform:
+                # Keep only the main versioned library and create symlink
+                main_lib = None
+                for item in build_dir.iterdir():
+                    if item.is_file() and "1.11" in item.name:
+                        main_lib = item
+                        break
+                
+                if main_lib:
+                    # Remove other files
+                    for item in build_dir.iterdir():
+                        if item.is_file() and item != main_lib:
+                            item.unlink()
+                    
+                    # Rename to standard .so name
+                    final_lib = build_dir / "libhighs.so"
+                    main_lib.rename(final_lib)
+
+            if "macos" in platform:
+                # Keep only the main versioned library and create symlink
+                main_lib = None
+                for item in build_dir.iterdir():
+                    if item.is_file() and "1.11" in item.name:
+                        main_lib = item
+                        break
+                
+                if main_lib:
+                    # Remove other files
+                    for item in build_dir.iterdir():
+                        if item.is_file() and item != main_lib:
+                            item.unlink()
+                    
+                    # Rename to standard .dylib name
+                    final_lib = build_dir / "libhighs.dylib"
+                    main_lib.rename(final_lib)
+
+                    
+
+
                 
         except Exception as e:
             Logger.error(f"Failed to clean up build directory for {platform}: {e}")

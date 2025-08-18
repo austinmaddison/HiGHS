@@ -44,12 +44,12 @@ jobs:
           python build.py build linux-x64 \
             --config ${{ env.BUILD_CONFIG }} \
             --extract-libs
-
+      
       - name: Upload library artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-x64
-          path: highs_patched/build-linux-x64/libhighs.so
+          path: highs_patched/build/linux-x64/libhighs.so
 
   package:
     name: Package Linux Library

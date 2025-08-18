@@ -70,7 +70,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}
-          path: highs_patched/build-${{ matrix.platform }}/libhighs.so
+          path: highs_patched/build/${{ matrix.platform }}/libhighs.so
 
   package-individual:
     name: Package Individual Android Libraries

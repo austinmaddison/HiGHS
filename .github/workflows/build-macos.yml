@@ -43,8 +43,8 @@ jobs:
       - name: Upload library artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macos-universal
-          path: highs_patched/build-macos/libhighs.dylib
+          name: macos
+          path: highs_patched/build/macos/libhighs.dylib
 
   package:
     name: Package macOS Library
@@ -59,7 +59,7 @@ jobs:
       - name: Package library
         run: |
           mkdir -p pkg/macos
-          cp _artifacts/macos-universal/libhighs.dylib pkg/macos/
+          cp _artifacts/macos/libhighs.dylib pkg/macos/
 
       - name: Create zip
         run: |
