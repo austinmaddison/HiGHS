@@ -7,59 +7,67 @@ on:
       - "CMakeLists.txt"
       - "cmake/**"
       - ".github/workflows/build-windows.yml"
-      - "src/**"
+      - "highs/**"
+      - "build_scripts/**"
+      - "build.py"
+
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  PYTHON_VERSION: "3.11"
+  BUILD_CONFIG: "Release"
+  PACKAGE_NAME: "dart-highs-prebuilt-lib-windows"
 
 jobs:
   build:
     name: Windows x64
     runs-on: windows-2022
-    env:
-      CMAKE_BUILD_PARALLEL_LEVEL: 4
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Setup Visual Studio
         uses: microsoft/setup-msbuild@v2
 
-      - name: Configure (Windows x64)
-        run: cmake --preset windows-x64
-
-      - name: Build (Windows x64)
-        run: cmake --build --preset windows-x64 --config Release
+      - name: Build using build script
+        run: |
+          python build.py build windows-x64 --config ${{ env.BUILD_CONFIG }} --extract-libs
 
       - name: Upload library artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: build-windows-x64/Release/highs.dll
+          path: highs_patched/build-windows-x64/highs.dll
 
   package:
-    name: Package plugin layout
+    name: Package Windows Library
     needs: [build]
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: windows-x64
           path: _artifacts
 
-      - name: Prepare combined layout
+      - name: Package library
         run: |
-          set -e
-          # copy Windows library
           mkdir -p pkg/windows
-          
-          cp _artifacts/highs.dll pkg/windows/
+          cp _artifacts/windows-x64/highs.dll pkg/windows/
 
-      - name: Zip deliverable
+      - name: Create zip
         run: |
-          (cd pkg && zip -r ../dart-highs-prebuilt-lib-windows.zip .)
+          (cd pkg && zip -r ../${{ env.PACKAGE_NAME }}.zip .)
 
-      - name: Upload combined artifact
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: dart-highs-prebuilt-lib-windows
-          path: dart-highs-prebuilt-lib-windows.zip
+          name: ${{ env.PACKAGE_NAME }}
+          path: ${{ env.PACKAGE_NAME }}.zip
 
       - name: Create Windows release
         uses: softprops/action-gh-release@v1
@@ -72,12 +80,31 @@ jobs:
             This release contains:
             - Windows x64 DLL ready for linking
             - Compatible with Visual Studio 2019+ and mingw-w64
+            - Supports Windows 10 and later
             
             **Usage:**
-            Extract the zip file and link against the `windows/highs.dll` library.
-            Make sure to distribute the DLL with your application.
+            ```batch
+            REM Extract the zip file
+            unzip ${{ env.PACKAGE_NAME }}.zip
+            
+            REM Link against the library (Visual Studio example)
+            cl your_app.c /link /LIBPATH:windows highs.lib
+            
+            REM Or using MinGW
+            gcc -Lwindows -lhighs your_app.c -o your_app.exe
+            ```
+            
+            **Runtime Requirements:**
+            - The `highs.dll` must be in the same directory as your executable
+            - Or in a directory listed in your system PATH
+            - Or you can use `LoadLibrary()` to load from a specific path
+            
+            **Development:**
+            - You'll need the corresponding `.lib` import library for linking
+            - Header files are available in the separate "includes" release
             
             Generated from commit: ${{ github.sha }}
-          files: dart-highs-prebuilt-lib-windows.zip
+            Build configuration: ${{ env.BUILD_CONFIG }}
+          files: ${{ env.PACKAGE_NAME }}.zip
           draft: false
           prerelease: false

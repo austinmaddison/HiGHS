@@ -6,7 +6,7 @@
             "displayName": "Windows x64",
             "generator": "Visual Studio 17 2022",
             "architecture": "x64",
-            "binaryDir": "${sourceDir}/build-windows-x64",
+            "binaryDir": "${sourceDir}/build/windows-x64",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "BUILD_SHARED_LIBS": "ON",
@@ -14,10 +14,32 @@
             }
         },
         {
+            "name": "windows-x64-mingw",
+            "displayName": "Windows x64 (MinGW Cross-Compile)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/windows-x64-mingw",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "BUILD_SHARED_LIBS": "ON",
+                "FAST_BUILD": "ON",
+                "CMAKE_SYSTEM_NAME": "Windows",
+                "CMAKE_C_COMPILER": "x86_64-w64-mingw32-gcc",
+                "CMAKE_CXX_COMPILER": "x86_64-w64-mingw32-g++",
+                "CMAKE_RC_COMPILER": "x86_64-w64-mingw32-windres",
+                "CMAKE_FIND_ROOT_PATH": "/opt/homebrew/Cellar/mingw-w64/13.0.0/toolchain-x86_64",
+                "CMAKE_FIND_ROOT_PATH_MODE_PROGRAM": "NEVER",
+                "CMAKE_FIND_ROOT_PATH_MODE_LIBRARY": "ONLY",
+                "CMAKE_FIND_ROOT_PATH_MODE_INCLUDE": "ONLY",
+                "CMAKE_CXX_FLAGS": "-O3 -DNDEBUG",
+                "CMAKE_C_FLAGS": "-O3 -DNDEBUG",
+                "CMAKE_SHARED_LINKER_FLAGS": "-s -Wl,--gc-sections,--strip-all"
+            }
+        },
+        {
             "name": "linux-x64",
             "displayName": "Linux x64",
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build-linux-x64",
+            "binaryDir": "${sourceDir}/build/linux-x64",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "BUILD_SHARED_LIBS": "ON",
@@ -29,21 +51,24 @@
             "name": "android-arm64",
             "displayName": "Android ARM64",
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build-android-arm64",
+            "binaryDir": "${sourceDir}/build/android-arm64",
             "toolchainFile": "$env{ANDROID_NDK_ROOT}/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "ANDROID_ABI": "arm64-v8a",
                 "ANDROID_PLATFORM": "android-24",
                 "BUILD_SHARED_LIBS": "ON",
-                "FAST_BUILD": "ON"
+                "FAST_BUILD": "ON",
+                "CMAKE_CXX_FLAGS": "-O3 -DNDEBUG",
+                "CMAKE_C_FLAGS": "-O3 -DNDEBUG",
+                "CMAKE_SHARED_LINKER_FLAGS": "-s -Wl,--gc-sections,--strip-all"
             }
         },
         {
             "name": "android-arm32",
             "inherits": "android-arm64",
             "displayName": "Android ARM32",
-            "binaryDir": "${sourceDir}/build-android-arm32",
+            "binaryDir": "${sourceDir}/build/android-arm32",
             "toolchainFile": "$env{ANDROID_NDK_ROOT}/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
                 "ANDROID_ABI": "armeabi-v7a"
@@ -53,7 +78,7 @@
             "name": "android-x86",
             "inherits": "android-arm64",
             "displayName": "Android x86",
-            "binaryDir": "${sourceDir}/build-android-x86",
+            "binaryDir": "${sourceDir}/build/android-x86",
             "toolchainFile": "$env{ANDROID_NDK_ROOT}/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
                 "ANDROID_ABI": "x86"
@@ -63,7 +88,7 @@
             "name": "android-x64",
             "inherits": "android-arm64",
             "displayName": "Android x64",
-            "binaryDir": "${sourceDir}/build-android-x64",
+            "binaryDir": "${sourceDir}/build/android-x64",
             "toolchainFile": "$env{ANDROID_NDK_ROOT}/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
                 "ANDROID_ABI": "x86_64"
@@ -73,7 +98,7 @@
             "name": "ios-arm64",
             "displayName": "iOS ARM64",
             "generator": "Xcode",
-            "binaryDir": "${sourceDir}/build-ios-arm64",
+            "binaryDir": "${sourceDir}/build/ios-arm64",
             "cacheVariables": {
                 "CMAKE_SYSTEM_NAME": "iOS",
                 "CMAKE_OSX_ARCHITECTURES": "arm64",
@@ -93,7 +118,7 @@
             "name": "ios-simulator-x64",
             "displayName": "iOS Simulator x64",
             "generator": "Xcode",
-            "binaryDir": "${sourceDir}/build-ios-simulator-x64",
+            "binaryDir": "${sourceDir}/build/ios-simulator-x64",
             "cacheVariables": {
                 "CMAKE_SYSTEM_NAME": "iOS",
                 "CMAKE_OSX_ARCHITECTURES": "x86_64",
@@ -113,7 +138,7 @@
             "name": "ios-simulator-arm64",
             "displayName": "iOS Simulator ARM64",
             "generator": "Xcode",
-            "binaryDir": "${sourceDir}/build-ios-simulator-arm64",
+            "binaryDir": "${sourceDir}/build/ios-simulator-arm64",
             "cacheVariables": {
                 "CMAKE_SYSTEM_NAME": "iOS",
                 "CMAKE_OSX_ARCHITECTURES": "arm64",
@@ -130,10 +155,10 @@
             }
         },
         {
-            "name": "macos-universal",
+            "name": "macos",
             "displayName": "macOS Universal",
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build-macos-universal",
+            "binaryDir": "${sourceDir}/build/macos",
             "cacheVariables": {
                 "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64",
                 "CMAKE_OSX_DEPLOYMENT_TARGET": "10.15",
@@ -150,6 +175,10 @@
             "name": "windows-x64",
             "configurePreset": "windows-x64",
             "configuration": "Release"
+        },
+        {
+            "name": "windows-x64-mingw",
+            "configurePreset": "windows-x64-mingw"
         },
         {
             "name": "linux-x64",
@@ -184,8 +213,8 @@
             "configurePreset": "ios-simulator-arm64"
         },
         {
-            "name": "macos-universal",
-            "configurePreset": "macos-universal"
+            "name": "macos",
+            "configurePreset": "macos"
         }
     ]
 }

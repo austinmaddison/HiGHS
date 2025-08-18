@@ -7,59 +7,69 @@ on:
       - "CMakeLists.txt"
       - "cmake/**"
       - ".github/workflows/build-macos.yml"
-      - "src/**"
+      - "highs/**"
+      - "build_scripts/**"
+      - "build.py"
+
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  PYTHON_VERSION: "3.11"
+  BUILD_CONFIG: "Release"
+  PACKAGE_NAME: "dart-highs-prebuilt-lib-macos"
 
 jobs:
   build:
     name: macOS Universal
     runs-on: macos-14
-    env:
-      CMAKE_BUILD_PARALLEL_LEVEL: 4
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Ninja
         run: brew install ninja
 
-      - name: Configure (macOS Universal)
-        run: cmake --preset macos-universal
-
-      - name: Build (macOS Universal)
-        run: cmake --build --preset macos-universal --config Release
+      - name: Build using build script
+        run: |
+          python build.py build macos \
+            --config ${{ env.BUILD_CONFIG }} \
+            --extract-libs
 
       - name: Upload library artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-universal
-          path: build-macos-universal/libhighs.dylib
+          path: highs_patched/build-macos/libhighs.dylib
 
   package:
-    name: Package plugin layout
+    name: Package macOS Library
     needs: [build]
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: macos-universal
           path: _artifacts
 
-      - name: Prepare combined layout
+      - name: Package library
         run: |
-          set -e
-          # copy macOS library
           mkdir -p pkg/macos
-          
-          cp _artifacts/libhighs.dylib pkg/macos/
+          cp _artifacts/macos-universal/libhighs.dylib pkg/macos/
 
-      - name: Zip deliverable
+      - name: Create zip
         run: |
-          (cd pkg && zip -r ../dart-highs-prebuilt-lib-macos.zip .)
+          (cd pkg && zip -r ../${{ env.PACKAGE_NAME }}.zip .)
 
-      - name: Upload combined artifact
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: dart-highs-prebuilt-lib-macos
-          path: dart-highs-prebuilt-lib-macos.zip
+          name: ${{ env.PACKAGE_NAME }}
+          path: ${{ env.PACKAGE_NAME }}.zip
 
       - name: Create macOS release
         uses: softprops/action-gh-release@v1
@@ -72,11 +82,28 @@ jobs:
             This release contains:
             - Universal binary supporting both Apple Silicon (arm64) and Intel (x86_64)
             - Dynamic library (.dylib) ready for linking
+            - Compatible with macOS 11.0+ (Big Sur and later)
             
             **Usage:**
-            Extract the zip file and link against the `macos/libhighs.dylib` library.
+            ```bash
+            # Extract the zip file
+            unzip ${{ env.PACKAGE_NAME }}.zip
+            
+            # Link against the library (example)
+            clang -L./macos -lhighs your_app.c -o your_app
+            
+            # Or copy to system location
+            sudo cp macos/libhighs.dylib /usr/local/lib/
+            ```
+            
+            **Runtime Requirements:**
+            The library will be loaded from:
+            1. The same directory as your executable
+            2. Paths in DYLD_LIBRARY_PATH
+            3. System library paths (/usr/local/lib, etc.)
             
             Generated from commit: ${{ github.sha }}
-          files: dart-highs-prebuilt-lib-macos.zip
+            Build configuration: ${{ env.BUILD_CONFIG }}
+          files: ${{ env.PACKAGE_NAME }}.zip
           draft: false
           prerelease: false

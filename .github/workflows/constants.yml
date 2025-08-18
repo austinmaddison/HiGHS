@@ -1,0 +1,48 @@
+# GitHub Actions Constants - Environmental Variables
+# This file defines constants that can be included in workflows
+
+name: Build Constants
+
+on:
+  workflow_call:
+
+env:
+  # Global environment variables
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  PYTHON_VERSION: "3.11"
+  BUILD_CONFIG: "Release"
+  
+  # File naming conventions
+  IOS_XCFRAMEWORK_NAME: "LibHighs"
+  
+  # Release naming patterns (will be expanded in workflows)
+  RELEASE_TAG_PREFIX_IOS: "ios-v"
+  RELEASE_TAG_PREFIX_ANDROID: "android-v"
+  RELEASE_TAG_PREFIX_MACOS: "macos-v"
+  RELEASE_TAG_PREFIX_WINDOWS: "windows-v"
+  RELEASE_TAG_PREFIX_LINUX: "linux-v"
+  RELEASE_TAG_PREFIX_INCLUDES: "includes-v"
+  
+  # Package names
+  PACKAGE_NAME_IOS: "dart-highs-prebuilt-lib-ios"
+  PACKAGE_NAME_ANDROID: "dart-highs-prebuilt-lib-android"
+  PACKAGE_NAME_ANDROID_BUNDLE: "android-jni-libs-bundle"
+  PACKAGE_NAME_MACOS: "dart-highs-prebuilt-lib-macos"
+  PACKAGE_NAME_WINDOWS: "dart-highs-prebuilt-lib-windows"
+  PACKAGE_NAME_LINUX: "dart-highs-prebuilt-lib-linux"
+  PACKAGE_NAME_INCLUDES: "highs-includes"
+  
+  # Android ABI mappings
+  ANDROID_ABI_ARM64: "arm64-v8a"
+  ANDROID_ABI_ARM32: "armeabi-v7a"
+  ANDROID_ABI_X64: "x86_64"
+  ANDROID_ABI_X86: "x86"
+
+jobs:
+  constants:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Export constants
+        run: |
+          echo "Constants loaded for workflow reuse"
+          echo "Build config: ${{ env.BUILD_CONFIG }}"

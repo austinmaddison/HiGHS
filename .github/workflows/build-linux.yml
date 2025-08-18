@@ -7,16 +7,29 @@ on:
       - "CMakeLists.txt"
       - "cmake/**"
       - ".github/workflows/build-linux.yml"
-      - "src/**"
+      - "highs/**"
+      - "build_scripts/**"
+      - "build.py"
+
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  PYTHON_VERSION: "3.11"
+  BUILD_CONFIG: "Release"
+  PACKAGE_NAME: "dart-highs-prebuilt-lib-linux"
 
 jobs:
   build:
     name: Linux x64
     runs-on: ubuntu-22.04
-    env:
-      CMAKE_BUILD_PARALLEL_LEVEL: 4
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v4
@@ -26,45 +39,42 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake
 
-      - name: Configure (Linux x64)
-        run: cmake --preset linux-x64
-
-      - name: Build (Linux x64)
-        run: cmake --build --preset linux-x64 --config Release
+      - name: Build using build script
+        run: |
+          python build.py build linux-x64 \
+            --config ${{ env.BUILD_CONFIG }} \
+            --extract-libs
 
       - name: Upload library artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-x64
-          path: build-linux-x64/libhighs.so
+          path: highs_patched/build-linux-x64/libhighs.so
 
   package:
-    name: Package plugin layout
+    name: Package Linux Library
     needs: [build]
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: linux-x64
           path: _artifacts
 
-      - name: Prepare combined layout
+      - name: Package library
         run: |
-          set -e
-          # copy Linux library
           mkdir -p pkg/linux
-          
-          cp _artifacts/libhighs.so pkg/linux/
+          cp _artifacts/linux-x64/libhighs.so pkg/linux/
 
-      - name: Zip deliverable
+      - name: Create zip
         run: |
-          (cd pkg && zip -r ../dart-highs-prebuilt-lib-linux.zip .)
+          (cd pkg && zip -r ../${{ env.PACKAGE_NAME }}.zip .)
 
-      - name: Upload combined artifact
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: dart-highs-prebuilt-lib-linux
-          path: dart-highs-prebuilt-lib-linux.zip
+          name: ${{ env.PACKAGE_NAME }}
+          path: ${{ env.PACKAGE_NAME }}.zip
 
       - name: Create Linux release
         uses: softprops/action-gh-release@v1
@@ -76,13 +86,38 @@ jobs:
             
             This release contains:
             - Linux x64 shared library (.so) ready for linking
-            - Compatible with most Linux distributions
+            - Compatible with most Linux distributions (Ubuntu 18.04+, CentOS 7+, etc.)
+            - Built with GCC on Ubuntu 22.04
             
             **Usage:**
-            Extract the zip file and link against the `linux/libhighs.so` library.
-            Make sure the library is in your LD_LIBRARY_PATH at runtime.
+            ```bash
+            # Extract the zip file
+            unzip ${{ env.PACKAGE_NAME }}.zip
+            
+            # Link against the library (example)
+            gcc -L./linux -lhighs your_app.c -o your_app
+            
+            # Or copy to system location
+            sudo cp linux/libhighs.so /usr/local/lib/
+            sudo ldconfig  # Update library cache
+            ```
+            
+            **Runtime Requirements:**
+            Make sure the library is in your LD_LIBRARY_PATH at runtime:
+            ```bash
+            export LD_LIBRARY_PATH=./linux:$LD_LIBRARY_PATH
+            ./your_app
+            
+            # Or install system-wide
+            sudo cp linux/libhighs.so /usr/local/lib/
+            sudo ldconfig
+            ```
+            
+            **Dependencies:**
+            This library has minimal dependencies and should work on most modern Linux systems.
             
             Generated from commit: ${{ github.sha }}
-          files: dart-highs-prebuilt-lib-linux.zip
+            Build configuration: ${{ env.BUILD_CONFIG }}
+          files: ${{ env.PACKAGE_NAME }}.zip
           draft: false
           prerelease: false

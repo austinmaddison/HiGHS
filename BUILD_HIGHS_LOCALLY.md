@@ -28,7 +28,7 @@ This Python script replaces the bash build scripts (`build-all.sh`, `build-ios.s
 
 # Build specific platforms
 ./build.py build windows-x64 linux-x64
-./build.py build macos-universal
+./build.py build macos
 
 # iOS specific builds
 ./build.py ios                # Build all iOS variants
@@ -48,7 +48,7 @@ The script automatically reads from `CMakePresets.json` and supports:
 - `ios-arm64` - iOS Device
 - `ios-simulator-x64` - iOS Simulator x64
 - `ios-simulator-arm64` - iOS Simulator ARM64
-- `macos-universal` - macOS Universal (ARM64 + x64)
+- `macos` - macOS Universal (ARM64 + x64)
 
 ## Features
 

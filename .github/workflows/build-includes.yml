@@ -9,12 +9,23 @@ on:
       - ".github/workflows/build-includes.yml"
       - "highs/**"
 
+env:
+  PYTHON_VERSION: "3.11"
+  PACKAGE_NAME: "highs-includes"
+
 jobs:
   package-includes:
     name: Package HiGHS Includes
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Setup build environment
         run: |
@@ -22,6 +33,7 @@ jobs:
           sudo apt-get install -y build-essential cmake ninja-build
 
       - name: Configure project to generate HConfig.h
+        working-directory: ./highs_patched
         run: |
           cmake -B build-temp -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -29,6 +41,7 @@ jobs:
             -DFAST_BUILD=ON
 
       - name: Package includes
+        working-directory: ./highs_patched
         run: |
           set -e
           mkdir -p pkg/include/highs
@@ -65,36 +78,124 @@ jobs:
           cp extern/zstr/strict_fstream.hpp pkg/include/highs/extern/zstr/
           cp extern/zstr/zstr.hpp pkg/include/highs/extern/zstr/
 
-      - name: Zip includes package
+      - name: Create directory structure documentation
+        working-directory: ./highs_patched
         run: |
-          (cd pkg && zip -r ../highs-includes.zip .)
+          cat > pkg/STRUCTURE.md << 'EOF'
+          # HiGHS Headers Directory Structure
+          
+          This package contains all the header files needed to compile against HiGHS.
+          
+          ## Main API
+          - `include/highs/Highs.h` - Main API header (include this in your code)
+          - `include/highs/HConfig.h` - Generated configuration header
+          
+          ## Directory Structure
+          ```
+          include/highs/
+          ├── Highs.h                    # Main API
+          ├── HConfig.h                  # Generated config
+          ├── interfaces/                # C API and other interfaces
+          ├── io/                       # I/O functionality
+          ├── ipm/                      # Interior Point Method
+          ├── lp_data/                  # LP data structures
+          ├── mip/                      # Mixed Integer Programming
+          ├── model/                    # Model classes
+          ├── parallel/                 # Parallel processing
+          ├── pdlp/                     # Primal-Dual LP
+          ├── presolve/                 # Presolving
+          ├── qpsolver/                 # Quadratic Programming
+          ├── simplex/                  # Simplex method
+          ├── test/                     # Test utilities
+          ├── util/                     # Utilities
+          └── extern/                   # External dependencies
+              ├── filereaderlp/         # File reader
+              ├── pdqsort/             # Pattern-defeating quicksort
+              └── zstr/                # Compressed streams
+          ```
+          
+          ## Usage
+          Add the `include/` directory to your compiler's include path:
+          
+          ```cpp
+          #include <highs/Highs.h>
+          
+          int main() {
+              Highs highs;
+              // Your code here
+              return 0;
+          }
+          ```
+          
+          ## Compiler Flags
+          ```bash
+          g++ -I./include your_app.cpp -lhighs -o your_app
+          ```
+          EOF
+
+      - name: List package contents
+        working-directory: ./highs_patched
+        run: |
+          echo "Package contents:"
+          find pkg -type f | sort
+
+      - name: Zip includes package
+        working-directory: ./highs_patched
+        run: |
+          (cd pkg && zip -r ../${{ env.PACKAGE_NAME }}.zip .)
 
       - name: Upload includes artifact
         uses: actions/upload-artifact@v4
         with:
-          name: highs-includes
-          path: highs-includes.zip
+          name: ${{ env.PACKAGE_NAME }}
+          path: highs_patched/${{ env.PACKAGE_NAME }}.zip
 
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: includes-v${{ github.run_number }}-${{ github.sha }}
-          name: HiGHS Includes Package
+          name: HiGHS C++ Headers Package
           body: |
             HiGHS C++ header files package
             
             This release contains all the header files needed to compile against HiGHS.
             
             **Contents:**
-            - Main API header: `include/highs/Highs.h`
-            - Generated config: `include/highs/HConfig.h` 
-            - All supporting headers with proper directory structure
-            - External dependencies headers
+            - 📁 **Main API**: `include/highs/Highs.h` - The primary header you'll include
+            - ⚙️ **Generated config**: `include/highs/HConfig.h` - Build-time configuration
+            - 🏗️ **All supporting headers** with proper directory structure preserved
+            - 📚 **External dependencies** headers included
+            - 📋 **Directory structure documentation**: `STRUCTURE.md`
             
-            **Usage:**
-            Extract the zip file and add `include/` to your compiler's include path.
+            **Quick Start:**
+            ```bash
+            # Extract the package
+            unzip ${{ env.PACKAGE_NAME }}.zip
+            
+            # Compile your project
+            g++ -I./include your_app.cpp -lhighs -o your_app
+            ```
+            
+            **In your C++ code:**
+            ```cpp
+            #include <highs/Highs.h>
+            
+            int main() {
+                Highs highs;
+                // Use HiGHS API...
+                return 0;
+            }
+            ```
+            
+            **CMake Integration:**
+            ```cmake
+            target_include_directories(your_target PRIVATE path/to/include)
+            target_link_libraries(your_target highs)
+            ```
+            
+            This package pairs with the platform-specific library releases to provide everything needed for HiGHS development.
             
             Generated from commit: ${{ github.sha }}
-          files: highs-includes.zip
+          files: highs_patched/${{ env.PACKAGE_NAME }}.zip
           draft: false
           prerelease: false

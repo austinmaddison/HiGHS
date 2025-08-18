@@ -1,4 +1,4 @@
-name: Build libhighs for iOS (XCFramework)
+name: Build libhighs for iOS
 
 on:
   workflow_dispatch:
@@ -7,28 +7,33 @@ on:
       - "CMakeLists.txt"
       - "cmake/**"
       - ".github/workflows/build-ios.yml"
-      - "src/**"
+      - "highs/**"
+      - "build_scripts/**"
+      - "build.py"
+
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  PYTHON_VERSION: "3.11"
+  BUILD_CONFIG: "Release"
+  XCFRAMEWORK_NAME: "LibHighs"
+  PACKAGE_NAME: "dart-highs-prebuilt-lib-ios"
 
 jobs:
-  build:
-    name: iOS (${{ matrix.platform }})
+  build-individual:
+    name: iOS ${{ matrix.platform }}
     runs-on: macos-14
     strategy:
       matrix:
-        include:
-          - platform: device
-            preset: ios-arm64
-            output_name: ios-arm64-device
-            lib_path: build-ios-arm64/Release/lib/libhighs.a
-          - platform: simulator-arm64
-            preset: ios-simulator-arm64
-            output_name: ios-simulator-arm64
-            lib_path: build-ios-simulator-arm64/Release/lib/libhighs.a
-    env:
-      CMAKE_BUILD_PARALLEL_LEVEL: 4
-      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+        platform: [ios-arm64, ios-simulator-arm64]
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Ninja
         run: brew install ninja
@@ -36,100 +41,113 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Patch presets (optional) - avoid hard-coded SDK names
+      - name: Build platform using build script
         run: |
-          # If your presets pin CMAKE_OSX_SYSROOT to e.g. "iphoneos18.5",
-          # replace with "iphoneos" / "iphonesimulator" for CI portability.
-          sed -i.bak 's/iphoneos[0-9\.]*/iphoneos/g' CMakePresets.json || true
-          sed -i.bak 's/iphonesimulator[0-9\.]*/iphonesimulator/g' CMakePresets.json || true
+          python build.py build ${{ matrix.platform }} --config ${{ env.BUILD_CONFIG }} --extract-libs
 
-      - name: Configure (${{ matrix.platform }})
-        run: cmake --preset ${{ matrix.preset }}
-
-      - name: Build (${{ matrix.platform }})
-        run: cmake --build --preset ${{ matrix.preset }} --config Release
-
-      - name: Upload library artifact
+      - name: Upload individual library
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.output_name }}
-          path: ${{ matrix.lib_path }}
+          name: ${{ matrix.platform }}
+          path: highs_patched/build-${{ matrix.platform }}/libhighs.a
 
-  assemble:
-    name: Assemble XCFramework
-    needs: [build]
+  build-xcframework:
+    name: iOS XCFramework
     runs-on: macos-14
+    needs: [build-individual]
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Build XCFramework using build script
+        run: |
+          python build.py build ios --config ${{ env.BUILD_CONFIG }}
+
+      - name: Upload XCFramework
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcframework
+          path: highs_patched/build/ios-xcframework/highs.xcframework
+
+  package:
+    name: Package iOS Release
+    needs: [build-individual, build-xcframework]
+    runs-on: ubuntu-22.04
+    steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: _artifacts
 
       - name: List downloaded artifacts
-        run: find _artifacts -type f -name "*.a" | sort
+        run: find _artifacts -type f | sort
 
-      - name: Assemble XCFramework
+      - name: Package individual libraries
         run: |
-          python3 ./.github/scripts/assemble_xcframework.py \
-            --device-lib _artifacts/ios-arm64-device/libhighs.a \
-            --sim-libs _artifacts/ios-simulator-arm64/libhighs.a \
-            --name LibHighs \
-            --out out-ios
-
-      - name: Upload XCFramework artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-xcframework
-          path: out-ios/
-
-  package:
-    name: Package plugin layout
-    needs: [assemble]
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: ios-xcframework
-          path: _artifacts
-
-      - name: Prepare combined layout
-        run: |
-          set -e
-          # copy iOS xcframework
-          mkdir -p pkg/ios
+          mkdir -p pkg-individual/ios
           
-          cp -R _artifacts/LibHighs.xcframework pkg/ios/
+          # Package individual architectures
+          cp -r _artifacts/ios-arm64 pkg-individual/ios/
+          cp -r _artifacts/ios-simulator-arm64 pkg-individual/ios/
+          
+          # Create zip for individual libraries
+          (cd pkg-individual && zip -r ../${{ env.PACKAGE_NAME }}-individual.zip .)
 
-      - name: Zip deliverable
+      - name: Package XCFramework
         run: |
-          (cd pkg && zip -r ../dart-highs-prebuilt-lib-ios.zip .)
+          mkdir -p pkg-xcframework/ios
+          cp -r _artifacts/ios-xcframework/highs.xcframework pkg-xcframework/ios/${{ env.XCFRAMEWORK_NAME }}.xcframework
+          
+          # Create zip for XCFramework
+          (cd pkg-xcframework && zip -r ../${{ env.PACKAGE_NAME }}.zip .)
 
-      - name: Upload combined artifact
+      - name: Upload individual package
         uses: actions/upload-artifact@v4
         with:
-          name: dart-highs-prebuilt-lib-ios
-          path: dart-highs-prebuilt-lib-ios.zip
+          name: ${{ env.PACKAGE_NAME }}-individual
+          path: ${{ env.PACKAGE_NAME }}-individual.zip
+
+      - name: Upload XCFramework package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}
+          path: ${{ env.PACKAGE_NAME }}.zip
 
       - name: Create iOS release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ios-v${{ github.run_number }}-${{ github.sha }}
-          name: HiGHS iOS XCFramework
+          name: HiGHS iOS Libraries
           body: |
-            HiGHS prebuilt XCFramework for iOS platforms
+            HiGHS prebuilt libraries for iOS platforms
             
             This release contains:
-            - iOS device library (arm64)
-            - iOS simulator library (arm64)
-            - XCFramework combining both for easy integration
+            
+            **XCFramework (Recommended)**:
+            - `${{ env.PACKAGE_NAME }}.zip` - Complete XCFramework supporting both device and simulator
+            - Ready to drag-and-drop into Xcode projects
+            
+            **Individual Libraries**:
+            - `${{ env.PACKAGE_NAME }}-individual.zip` - Separate .a files for each architecture
+            - `ios-arm64/` - iOS device library (ARM64)
+            - `ios-simulator-arm64/` - iOS simulator library (ARM64)
             
             **Usage:**
-            Extract the zip file and add the `ios/LibHighs.xcframework` to your iOS project.
-            The XCFramework supports both device and simulator builds.
+            For most users, download the XCFramework package and add `${{ env.XCFRAMEWORK_NAME }}.xcframework` to your iOS project.
             
             Generated from commit: ${{ github.sha }}
-          files: dart-highs-prebuilt-lib-ios.zip
+            Build configuration: ${{ env.BUILD_CONFIG }}
+          files: |
+            ${{ env.PACKAGE_NAME }}.zip
+            ${{ env.PACKAGE_NAME }}-individual.zip
           draft: false
           prerelease: false
