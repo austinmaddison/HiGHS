@@ -1,4 +1,4 @@
-# HiGHS - High Performance Linear Optimization Software
+# HiGHS Multi-Platform Libs
 
 This repository contains a patched version of HiGHS optimized for use with Dart and Flutter via FFI.
 
