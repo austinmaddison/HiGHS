@@ -1,6 +1,6 @@
 # HiGHS Multi-Platform Libs
 
-This repository contains a patched version of HiGHS optimized for use with Dart and Flutter via FFI.
+This repository contains a patched version of HiGHS optimized for use in FFI.
 
 ## About
 
