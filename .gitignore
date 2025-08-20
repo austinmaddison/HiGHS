@@ -1,1 +1,3 @@
 highs_patched/build
+__pycache__
+.DS_Store
